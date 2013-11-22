@@ -1,7 +1,7 @@
 package ca.uptoeleven.gofish
 
 class Deck(c: List[Card]) {
-  val cards = c
+  private val cards = c
   
   def this() = {
     this(Deck.AllCardsInOrder)
@@ -12,7 +12,7 @@ class Deck(c: List[Card]) {
   }
   
   def dealCard = {
-    (cards.head, cards.tail)
+    (cards.head, new Deck(cards.tail))
   }
 }
 

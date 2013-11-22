@@ -1,4 +1,7 @@
 package ca.uptoeleven.gofish
 
-class GameState() {
+case class GameState(
+    player1State: PlayerState,
+    player2State: PlayerState,
+    remainingCards: Deck) {
 }

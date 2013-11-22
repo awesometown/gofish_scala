@@ -4,6 +4,4 @@ class PlayerHand(cards: List[Card]) {
 	def this() = {
 	  this(List())
 	}
-	
-	
 }
