@@ -12,7 +12,7 @@ class Deck(c: List[Card]) {
   }
   
   def dealCard = {
-    (cards.head, cards.tail)
+    (cards.head, new Deck(cards.tail))
   }
 }
 

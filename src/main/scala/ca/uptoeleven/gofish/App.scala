@@ -8,7 +8,7 @@ object App {
     var (card, deck) = (new Deck).shuffle.dealCard
     println(card)
     
-    val system = ActorSystem("mySystem")
+    val system = ActorSystem("gameSystem")
     val gameLogic = system.actorOf(Props[GameLogic], "gameLogic")
     val dummy1 = system.actorOf(Props[Dummy], "dummy1")
     val dummy2 = system.actorOf(Props[Dummy], "dummy2")
@@ -18,6 +18,7 @@ object App {
     gameLogic.tell(Join, dummy2)
     
     gameLogic.tell(Play(new Card(Clubs, 1)), dummy1)
+    gameLogic.tell(Play(new Card(Clubs, 5)), dummy1)
     gameLogic.tell(Play(new Card(Clubs, 2)), dummy2)
     
     system.shutdown
