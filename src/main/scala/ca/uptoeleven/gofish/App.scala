@@ -21,7 +21,10 @@ object App {
     gameLogic.tell(Play(new Card(Clubs, 5)), dummy1)
     gameLogic.tell(Play(new Card(Clubs, 2)), dummy2)
     
+    Thread.sleep(2000)
+    
     system.shutdown
+    println("done")
   }
   
   class Dummy extends Actor {

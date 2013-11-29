@@ -20,40 +20,65 @@ case object WaitingForPlayers extends State
 case object Playing extends State
 case object GameOver extends State
 
-sealed trait Data
-case object Uninitialized extends Data
-case class OnePlayer(player1: ActorRef) extends Data
+sealed trait GameData
+case object Uninitialized extends GameData
+case class OnePlayer(player1: ActorRef) extends GameData
 
-case class GameState(currPlayer: ActorRef, nextPlayer: ActorRef) extends Data
+case class GameState(players: List[ActorRef], currPlayerId: Int) extends GameData {
+  def incrPlayer: GameState = {
+    new GameState(players, if (currPlayerId >= players.size) 0 else (currPlayerId + 1))
+  }
+  
+  def currPlayer: ActorRef = {
+    players(currPlayerId)
+  }
+}
 
-class GameLogic extends Actor with LoggingFSM[State, Data] {
+class GameLogic extends Actor with LoggingFSM[State, GameData] {
 
+  val MinPlayers = 2
+  
   startWith(WaitingForPlayers, Uninitialized)
 
   when(WaitingForPlayers) {
     case Event(Join, Uninitialized) =>
-      println("player1 joined")
-      sender ! YouAre(1)
-      stay using OnePlayer(sender)
-    case Event(Join, OnePlayer(player1)) =>
-      println("player2 joined")
-      sender ! YouAre(2)
-      goto(Playing) using GameState(player1, sender)
+      val playerId = 0
+      println("player" + playerId + " joined")
+      sender ! YouAre(playerId)
+      stay using GameState(List(sender), 0)
+    case Event(Join, GameState(players, currPlayerId)) =>
+      val playerId = players.size
+      println("player" + playerId + " joined")
+      sender ! YouAre(playerId)
+      val newState = GameState((sender :: players).reverse, currPlayerId)
+      //newState.currPlayer ! NotifyPlayerTurn(currPlayerId)
+      goto(Playing) using newState 
   }
 
   when(Playing) {
-    case Event(Play(card), data: GameState) =>
-      if (data.currPlayer == sender) {
+    case Event(Play(card), gameState: GameState) =>
+      if (gameState.currPlayer == sender) {
         println("Got message from correct player")
-        stay using GameState(data.nextPlayer, data.currPlayer)
+        val newState = gameState.incrPlayer
+        //newState.currPlayer ! NotifyPlayerTurn(newState.currPlayerId)
+        goto(Playing) using newState
       } else {
         println("Got play message from some other dude")
         stay
       }
-      
+//    case Event(Play, _) =>
+//      println("hmm...")
+//      stay
   }
 
   onTransition {
+    case _ -> Playing =>
+      stateData match {
+        case gameState: GameState =>
+          gameState.currPlayer ! NotifyPlayerTurn(gameState.currPlayerId)
+        case _ =>
+          //don't care
+      }
     case x -> y => println("Moved from " + x + " to " + y)
   }
 }
