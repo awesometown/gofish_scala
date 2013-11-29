@@ -8,6 +8,11 @@ case class Play(card: Card)
 
 
 case class YouAre(playerId: Int)
+case class NotifyHand(hand: PlayerHand)
+case class NotifyPlayerTurn(playerId: Int)
+case class NotifyGameOver(winnerId: Int)
+case class MakePlay(targetPlayerId: Int, requestedRank: Int)
+
 case class NotifyState(gameState: GameState)
 
 sealed trait State
