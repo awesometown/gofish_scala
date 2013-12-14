@@ -26,4 +26,14 @@ object Deck {
   def dealCard(deck: List[Card]) = {
     (deck.head, deck.tail)
   }
+  def dealCards(hands: List[PlayerHand], deck: List[Card]): (List[PlayerHand], List[Card]) = {
+    if (hands == Nil) {
+      (List[PlayerHand](), deck)
+    } else {
+      val newHand = hands.head.addCard(deck.head)
+      val (newHands, remainingDeck) = dealCards(hands.tail, deck.tail)
+      (newHand :: newHands, remainingDeck)
+    }
+  }
+
 }
