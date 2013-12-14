@@ -6,7 +6,6 @@ import akka.actor.LoggingFSM
 case object Join
 case class Play(card: Card)
 
-
 case class YouAre(playerId: Int)
 case class NotifyHand(hand: PlayerHand)
 case class NotifyPlayerTurn(playerId: Int)
@@ -24,11 +23,13 @@ sealed trait GameData
 case object Uninitialized extends GameData
 case class OnePlayer(player1: ActorRef) extends GameData
 
+case class GamePlayerState(hand: PlayerHand)
+
 case class GameState(players: List[ActorRef], currPlayerId: Int) extends GameData {
   def incrPlayer: GameState = {
     new GameState(players, if (currPlayerId >= players.size) 0 else (currPlayerId + 1))
   }
-  
+
   def currPlayer: ActorRef = {
     players(currPlayerId)
   }
@@ -37,7 +38,7 @@ case class GameState(players: List[ActorRef], currPlayerId: Int) extends GameDat
 class GameLogic extends Actor with LoggingFSM[State, GameData] {
 
   val MinPlayers = 2
-  
+
   startWith(WaitingForPlayers, Uninitialized)
 
   when(WaitingForPlayers) {
@@ -50,9 +51,29 @@ class GameLogic extends Actor with LoggingFSM[State, GameData] {
       val playerId = players.size
       println("player" + playerId + " joined")
       sender ! YouAre(playerId)
+
       val newState = GameState((sender :: players).reverse, currPlayerId)
       //newState.currPlayer ! NotifyPlayerTurn(currPlayerId)
-      goto(Playing) using newState 
+      goto(Playing) using newState
+  }
+
+  def dealHands(gameState: GameState) = {
+    val deck = Deck.shuffledDeck
+    for (player <- gameState.players) {
+      var playerHand = new PlayerHand
+      for (i <- 1 to 5) {
+
+      }
+    }
+  }
+
+  def dealCardToAllPlayers(hands: List[PlayerHand], deck: Deck) {
+    hands.fo
+  }
+  
+  def dealCard(hand: PlayerHand, deck: Deck) = {
+    val (card, newDeck) = deck.dealCard
+    (hand.addCard(card), newDeck)
   }
 
   when(Playing) {
@@ -66,9 +87,9 @@ class GameLogic extends Actor with LoggingFSM[State, GameData] {
         println("Got play message from some other dude")
         stay
       }
-//    case Event(Play, _) =>
-//      println("hmm...")
-//      stay
+    //    case Event(Play, _) =>
+    //      println("hmm...")
+    //      stay
   }
 
   onTransition {
@@ -77,7 +98,7 @@ class GameLogic extends Actor with LoggingFSM[State, GameData] {
         case gameState: GameState =>
           gameState.currPlayer ! NotifyPlayerTurn(gameState.currPlayerId)
         case _ =>
-          //don't care
+        //don't care
       }
     case x -> y => println("Moved from " + x + " to " + y)
   }

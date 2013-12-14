@@ -5,5 +5,7 @@ class PlayerHand(cards: List[Card]) {
 	  this(List())
 	}
 	
-	
+	def addCard(card: Card) {
+	  new PlayerHand(card :: cards)
+	}
 }
