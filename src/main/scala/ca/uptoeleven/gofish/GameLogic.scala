@@ -67,25 +67,6 @@ class GameLogic extends Actor with LoggingFSM[State, GameData] {
     }
   }
 
-  //  def dealCardToAllPlayers(hands: List[PlayerHand], deck: List[Card]) {
-  //	  val newHands = hands.foreach(hand => hand.addCard(deck.head); deck.)
-  //  }
-
-  def dealCard(hands: List[PlayerHand], deck: List[Card]): (List[PlayerHand], List[Card]) = {
-    if (hands == Nil) {
-      (List[PlayerHand](), deck)
-    } else {
-      val newHand = hands.head.addCard(deck.head)
-      val (newHands, remainingDeck) = dealCard(hands.tail, deck.tail)
-      (newHand :: newHands, remainingDeck)
-    }
-  }
-
-  //  def dealCard(hand: PlayerHand, deck: List[Card]) = {
-  //    val (card, newDeck) = deck.dealCard
-  //    (hand.addCard(card), newDeck)
-  //  }
-
   when(Playing) {
     case Event(Play(card), gameState: GameState) =>
       if (gameState.currPlayer == sender) {

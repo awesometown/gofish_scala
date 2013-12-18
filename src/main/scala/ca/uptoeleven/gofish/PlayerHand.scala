@@ -1,6 +1,8 @@
 package ca.uptoeleven.gofish
 
-class PlayerHand(cards: List[Card]) {
+class PlayerHand(c: List[Card]) {
+  val cards = c
+  
   def this() = {
     this(List())
   }
