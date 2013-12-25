@@ -29,23 +29,27 @@ class Player extends Actor with LoggingFSM[PlayerState, PlayerData] {
   
   when(WaitingForId) {
     case Event(YouAre(id), _) =>
+      println("I am " + id)
       goto(WaitingForHand) using PlayerGameData(id, null)
   }
   
   when(WaitingForHand) {
     case Event(NotifyHand(hand), PlayerGameData(id, _)) =>
+      println("My hand: " + hand)
       goto(WaitingForTurn) using PlayerGameData(id, hand)
   }
   
   when(WaitingForTurn) {
     case Event(NotifyPlayerTurn(idForTurn), PlayerGameData(myId, _)) =>
+      println("My turn!")
       if(idForTurn == myId) {
-        //make play
+        sender ! Play(new Card(Diamonds, 5))
         stay
       } else {
         stay
       }
     case Event(NotifyGameOver(winnderId), PlayerGameData(id, _)) =>
+      println("Not my turn :(")
       goto(WaitingForHand) using PlayerGameData(id, null)
   }
 }

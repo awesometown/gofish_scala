@@ -23,14 +23,16 @@ sealed trait GameData
 case object Uninitialized extends GameData
 case class OnePlayer(player1: ActorRef) extends GameData
 
-case class GamePlayerState(hand: PlayerHand)
+case class GamePlayer(playerRef: ActorRef, hand: PlayerHand)
 
-case class GameState(players: List[ActorRef], currPlayerId: Int) extends GameData {
+case class WaitingPlayers(waitingPlayers: List[ActorRef]) extends GameData
+
+case class GameState(dealer: Dealer, players: List[GamePlayer], currPlayerId: Int) extends GameData {
   def incrPlayer: GameState = {
-    new GameState(players, if (currPlayerId >= players.size) 0 else (currPlayerId + 1))
+    new GameState(dealer, players, if (currPlayerId >= players.size-1) 0 else (currPlayerId + 1))
   }
 
-  def currPlayer: ActorRef = {
+  def currPlayer: GamePlayer = {
     players(currPlayerId)
   }
 }
@@ -38,59 +40,59 @@ case class GameState(players: List[ActorRef], currPlayerId: Int) extends GameDat
 class GameLogic extends Actor with LoggingFSM[State, GameData] {
 
   val MinPlayers = 2
+  val StartingCards = 5
 
-  startWith(WaitingForPlayers, Uninitialized)
+  startWith(WaitingForPlayers, WaitingPlayers(List[ActorRef]()))
 
   when(WaitingForPlayers) {
-    case Event(Join, Uninitialized) =>
-      val playerId = 0
-      println("player" + playerId + " joined")
-      sender ! YouAre(playerId)
-      stay using GameState(List(sender), 0)
-    case Event(Join, GameState(players, currPlayerId)) =>
+    case Event(Join, WaitingPlayers(players)) =>
       val playerId = players.size
-      println("player" + playerId + " joined")
+      println("player " + playerId + " joined")
       sender ! YouAre(playerId)
-
-      val newState = GameState((sender :: players).reverse, currPlayerId)
-      //newState.currPlayer ! NotifyPlayerTurn(currPlayerId)
-      goto(Playing) using newState
-  }
-
-  def dealHands(gameState: GameState) = {
-    val deck = Deck.shuffledDeck
-    for (player <- gameState.players) {
-      var playerHand = new PlayerHand
-      for (i <- 1 to 5) {
-
+      
+      val newPlayers = (sender :: players).reverse
+      if(newPlayers.size < MinPlayers) {
+        goto(WaitingForPlayers) using WaitingPlayers(newPlayers)
+      } else {
+        val startingState = buildStartingGameState(newPlayers)
+        startingState.players.foreach(player => player.playerRef ! NotifyHand(player.hand))
+        goto(Playing) using startingState
       }
-    }
   }
-
+    
   when(Playing) {
     case Event(Play(card), gameState: GameState) =>
-      if (gameState.currPlayer == sender) {
+      println("Got message")
+      println(gameState.players)
+      println(gameState.currPlayer)
+      println(sender)
+      if (gameState.currPlayer.playerRef == sender) {
         println("Got message from correct player")
         val newState = gameState.incrPlayer
-        //newState.currPlayer ! NotifyPlayerTurn(newState.currPlayerId)
+        newState.currPlayer.playerRef ! NotifyPlayerTurn(newState.currPlayerId)
         goto(Playing) using newState
       } else {
         println("Got play message from some other dude")
         stay
       }
-    //    case Event(Play, _) =>
-    //      println("hmm...")
-    //      stay
   }
 
   onTransition {
     case _ -> Playing =>
-      stateData match {
+      nextStateData match {
         case gameState: GameState =>
-          gameState.currPlayer ! NotifyPlayerTurn(gameState.currPlayerId)
+          println("notify player")
+          gameState.currPlayer.playerRef ! NotifyPlayerTurn(gameState.currPlayerId)
         case _ =>
-        //don't care
+          //don't care
       }
     case x -> y => println("Moved from " + x + " to " + y)
+  }
+  
+  def buildStartingGameState(playerRefs: List[ActorRef]) = {
+    val dealer = new Dealer(Deck.shuffledDeck)
+    val playerHands = dealer.dealStartingHands(playerRefs.size, StartingCards)
+    val players = playerRefs.zip(playerHands) map { case(ref, hand) => new GamePlayer(ref, hand) }
+    new GameState(dealer, players, 0)
   }
 }

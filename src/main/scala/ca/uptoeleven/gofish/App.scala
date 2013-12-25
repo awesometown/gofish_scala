@@ -10,26 +10,26 @@ object App {
     
     val system = ActorSystem("gameSystem")
     val gameLogic = system.actorOf(Props[GameLogic], "gameLogic")
-    val dummy1 = system.actorOf(Props[Player], "dummy1")
-    val dummy2 = system.actorOf(Props[Player], "dummy2")
+    val player1 = system.actorOf(Props[Player], "player1")
+    val player2 = system.actorOf(Props[Player], "player2")
     
     val inbox = Inbox.create(system)
-    dummy1.tell(JoinGame(gameLogic), ActorRef.noSender)
-    dummy2.tell(JoinGame(gameLogic), ActorRef.noSender)
+    player1.tell(JoinGame(gameLogic), ActorRef.noSender)
+    player2.tell(JoinGame(gameLogic), ActorRef.noSender)
     
     //gameLogic.tell(Play(new Card(Clubs, 1)), dummy1)
     //gameLogic.tell(Play(new Card(Clubs, 5)), dummy1)
     //gameLogic.tell(Play(new Card(Clubs, 2)), dummy2)
     
-    Thread.sleep(2000)
+    Thread.sleep(5000)
     
     system.shutdown
     println("done")
   }
   
-  class Dummy extends Actor {
-    def receive = {
-      case whatever => println(whatever)
-    }
-  }
+//  class Dummy extends Actor {
+//    def receive = {
+//      case whatever => println(whatever)
+//    }
+//  }
 }

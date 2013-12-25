@@ -44,9 +44,13 @@ object Deck {
   val Ranks = 1 to 13
   val AllCardsInOrder = for (z <- Deck.Suits; rank <- Deck.Ranks) yield (new Card(z, rank))
   
-  def shuffledDeck = {
-    new Deck(util.Random.shuffle(AllCardsInOrder))
+  val shuffledDeck = {
+    util.Random.shuffle(AllCardsInOrder)
   }
+  
+  //def shuffledDeck = {
+  //  new Deck(util.Random.shuffle(AllCardsInOrder))
+  //}
   
 //  def dealCard(deck: List[Card]) = {
 //    (deck.head, deck.tail)
