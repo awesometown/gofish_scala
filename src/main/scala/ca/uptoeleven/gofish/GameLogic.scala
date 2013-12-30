@@ -2,6 +2,7 @@ package ca.uptoeleven.gofish
 
 import akka.actor.{ Actor, ActorRef, FSM }
 import akka.actor.LoggingFSM
+import akka.actor.Props
 
 case object Join
 case class Play(card: Card)
@@ -25,14 +26,14 @@ case class OnePlayer(player1: ActorRef) extends GameData
 
 case class GamePlayer(playerRef: ActorRef, hand: PlayerHand)
 
-case class WaitingPlayers(waitingPlayers: List[ActorRef]) extends GameData
+case class WaitingPlayers(waitingPlayers: Map[Int, ActorRef]) extends GameData
 
-case class GameState(dealer: Dealer, players: List[GamePlayer], currPlayerId: Int) extends GameData {
+case class GameState(dealer: Dealer, players: Map[Int, ActorRef], currPlayerId: Int) extends GameData {
   def incrPlayer: GameState = {
-    new GameState(dealer, players, if (currPlayerId >= players.size-1) 0 else (currPlayerId + 1))
+    new GameState(dealer, players, if (currPlayerId >= players.size - 1) 0 else (currPlayerId + 1))
   }
 
-  def currPlayer: GamePlayer = {
+  def currPlayer: ActorRef = {
     players(currPlayerId)
   }
 }
@@ -40,59 +41,45 @@ case class GameState(dealer: Dealer, players: List[GamePlayer], currPlayerId: In
 class GameLogic extends Actor with LoggingFSM[State, GameData] {
 
   val MinPlayers = 2
-  val StartingCards = 5
+  val NumStartingCards = 5
 
-  startWith(WaitingForPlayers, WaitingPlayers(List[ActorRef]()))
+  startWith(WaitingForPlayers, WaitingPlayers(Map[Int, ActorRef]()))
 
   when(WaitingForPlayers) {
     case Event(Join, WaitingPlayers(players)) =>
       val playerId = players.size
-      println("player " + playerId + " joined")
-      sender ! YouAre(playerId)
-      
-      val newPlayers = (sender :: players).reverse
-      if(newPlayers.size < MinPlayers) {
+      val newPlayer = context.actorOf(Props[Player])
+      val newPlayers = players + (playerId -> newPlayer)
+      newPlayer ! YouAre(playerId)
+
+      if (newPlayers.size < MinPlayers) {
         goto(WaitingForPlayers) using WaitingPlayers(newPlayers)
       } else {
-        val startingState = buildStartingGameState(newPlayers)
-        startingState.players.foreach(player => player.playerRef ! NotifyHand(player.hand))
+        val dealer = new Dealer(Deck.shuffledDeck)
+        val playerHands = dealer.dealStartingHands(newPlayers.size, NumStartingCards)
+        newPlayers.values.zip(playerHands).foreach { case (player, hand) => player ! NotifyHand(hand) }
+        val startingState = GameState(dealer, newPlayers, 0)
         goto(Playing) using startingState
       }
   }
-    
+
   when(Playing) {
+    case Event(Play(card), gameState: GameState) if (gameState.currPlayer == sender) =>
+      val newState = gameState.incrPlayer
+      newState.currPlayer ! NotifyPlayerTurn(newState.currPlayerId)
+      goto(Playing) using newState
     case Event(Play(card), gameState: GameState) =>
-      println("Got message")
-      println(gameState.players)
-      println(gameState.currPlayer)
-      println(sender)
-      if (gameState.currPlayer.playerRef == sender) {
-        println("Got message from correct player")
-        val newState = gameState.incrPlayer
-        newState.currPlayer.playerRef ! NotifyPlayerTurn(newState.currPlayerId)
-        goto(Playing) using newState
-      } else {
-        println("Got play message from some other dude")
-        stay
-      }
+      stay
   }
 
   onTransition {
     case _ -> Playing =>
       nextStateData match {
         case gameState: GameState =>
-          println("notify player")
-          gameState.currPlayer.playerRef ! NotifyPlayerTurn(gameState.currPlayerId)
+          gameState.currPlayer ! NotifyPlayerTurn(gameState.currPlayerId)
         case _ =>
-          //don't care
+        //don't care
       }
     case x -> y => println("Moved from " + x + " to " + y)
-  }
-  
-  def buildStartingGameState(playerRefs: List[ActorRef]) = {
-    val dealer = new Dealer(Deck.shuffledDeck)
-    val playerHands = dealer.dealStartingHands(playerRefs.size, StartingCards)
-    val players = playerRefs.zip(playerHands) map { case(ref, hand) => new GamePlayer(ref, hand) }
-    new GameState(dealer, players, 0)
   }
 }

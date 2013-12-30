@@ -5,9 +5,8 @@ import akka.actor.LoggingFSM
 import akka.actor.ActorRef
 
 sealed trait PlayerState
-case object NotJoined extends PlayerState
-case object WaitingForHand extends PlayerState
 case object WaitingForId extends PlayerState
+case object WaitingForHand extends PlayerState
 case object WaitingForTurn extends PlayerState
 case object MyTurn extends PlayerState
 
@@ -19,13 +18,7 @@ case class JoinGame(game: ActorRef)
 
 class Player extends Actor with LoggingFSM[PlayerState, PlayerData] {
 
-  startWith(NotJoined, PlayerUninitialized)
-
-   when(NotJoined) {
-    case Event(JoinGame(game), _) =>
-     game ! Join
-     goto(WaitingForId)
-  }
+  startWith(WaitingForId, PlayerUninitialized)
   
   when(WaitingForId) {
     case Event(YouAre(id), _) =>
