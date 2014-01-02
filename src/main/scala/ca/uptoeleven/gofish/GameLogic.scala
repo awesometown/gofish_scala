@@ -6,15 +6,25 @@ import akka.actor.Props
 
 case object Join
 
+//Targeted Outgoing Messages
 case class YouAre(playerId: Int, client: ActorRef)
 case class NotifyHand(hand: PlayerHand)
 case class NotifyPlayerTurn(playerId: Int)
-case class NotifyGameOver(winnerId: Int)
-case class MakePlay(targetPlayerId: Int, requestedRank: Int)
+case class NotifyState(gameState: GameState)
+
+//Messages from Player Actors
+case class MakePlay(targetPlayerId: Int, card: Card)
 case class MatchFound(fromPlayerId: Int, card: Card)
 case class GoFish(fromPlayerId: Int)
 
-case class NotifyState(gameState: GameState)
+//Broadcast Messages
+sealed trait BroadcastMessage
+case class NotifyPlayerJoined(playerId: Int) extends BroadcastMessage
+case class NewNotifyPlayerTurn(playerId: Int) extends BroadcastMessage
+case class NotifyMoveMade(requestingId: Int, targetId: Int, requesterCard: Card) extends BroadcastMessage
+case class NotifyMatch(requestingId: Int, targetId: Int, requesterCard: Card, matchingCard: Card) extends BroadcastMessage
+case class NotifyGoFish(requestingId: Int, targetId: Int, requesterCard: Card) extends BroadcastMessage
+case class NotifyGameOver(winnerId: Int)
 
 sealed trait State
 case object WaitingForPlayers extends State

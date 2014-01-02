@@ -45,9 +45,7 @@ class Player extends Actor with LoggingFSM[PlayerState, PlayerData] {
       goto(WaitingForClientChoice)
     case Event(NotifyGameOver(winnderId), PlayerGameData(id, client, _)) =>
       println("Not my turn :(")
-      goto(WaitingForHand) using PlayerGameData(id, client, null)
-    case Event(CardRequested(_, card), PlayerGameData(_, _, hand)) if (hand.cards.contains(card)) =>
-      
+      goto(WaitingForHand) using PlayerGameData(id, client, null)    
   }
   
   when(WaitingForClientChoice) {
