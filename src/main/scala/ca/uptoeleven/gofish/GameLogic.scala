@@ -5,13 +5,14 @@ import akka.actor.LoggingFSM
 import akka.actor.Props
 
 case object Join
-case class Play(card: Card)
 
-case class YouAre(playerId: Int)
+case class YouAre(playerId: Int, client: ActorRef)
 case class NotifyHand(hand: PlayerHand)
 case class NotifyPlayerTurn(playerId: Int)
 case class NotifyGameOver(winnerId: Int)
 case class MakePlay(targetPlayerId: Int, requestedRank: Int)
+case class MatchFound(fromPlayerId: Int, card: Card)
+case class GoFish(fromPlayerId: Int)
 
 case class NotifyState(gameState: GameState)
 
@@ -50,7 +51,7 @@ class GameLogic extends Actor with LoggingFSM[State, GameData] {
       val playerId = players.size
       val newPlayer = context.actorOf(Props[Player])
       val newPlayers = players + (playerId -> newPlayer)
-      newPlayer ! YouAre(playerId)
+      newPlayer ! YouAre(playerId, sender)
 
       if (newPlayers.size < MinPlayers) {
         goto(WaitingForPlayers) using WaitingPlayers(newPlayers)
@@ -64,11 +65,11 @@ class GameLogic extends Actor with LoggingFSM[State, GameData] {
   }
 
   when(Playing) {
-    case Event(Play(card), gameState: GameState) if (gameState.currPlayer == sender) =>
+    case Event(MakePlay(target, card), gameState: GameState) if (gameState.currPlayer == sender) =>
       val newState = gameState.incrPlayer
       newState.currPlayer ! NotifyPlayerTurn(newState.currPlayerId)
       goto(Playing) using newState
-    case Event(Play(card), gameState: GameState) =>
+    case Event(MakePlay(target, card), gameState: GameState) =>
       stay
   }
 

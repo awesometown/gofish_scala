@@ -8,41 +8,60 @@ sealed trait PlayerState
 case object WaitingForId extends PlayerState
 case object WaitingForHand extends PlayerState
 case object WaitingForTurn extends PlayerState
+case object WaitingForClientChoice extends PlayerState
+case object WaitingForAnswer extends PlayerState
 case object MyTurn extends PlayerState
 
 sealed trait PlayerData
 case object PlayerUninitialized extends PlayerData
-case class PlayerGameData(playerId: Int, hand: PlayerHand) extends PlayerData
+case class PlayerGameData(playerId: Int, client: ActorRef, hand: PlayerHand) extends PlayerData
 
-case class JoinGame(game: ActorRef)
+case class GameMessage(message: Any)
+
+case class ClientChoice(targetPlayerId: Int, card: Card)
+//case class JoinGame(game: ActorRef)
 
 class Player extends Actor with LoggingFSM[PlayerState, PlayerData] {
 
   startWith(WaitingForId, PlayerUninitialized)
   
   when(WaitingForId) {
-    case Event(YouAre(id), _) =>
+    case Event(YouAre(id, client), _) =>
       println("I am " + id)
-      goto(WaitingForHand) using PlayerGameData(id, null)
+      client ! GameMessage(YouAre(id, client))
+      goto(WaitingForHand) using PlayerGameData(id, client, null)
   }
   
   when(WaitingForHand) {
-    case Event(NotifyHand(hand), PlayerGameData(id, _)) =>
-      println("My hand: " + hand)
-      goto(WaitingForTurn) using PlayerGameData(id, hand)
+    case Event(NotifyHand(hand), PlayerGameData(id, client, _)) =>
+      client ! GameMessage(NotifyHand(hand))
+      goto(WaitingForTurn) using PlayerGameData(id, client, hand)
   }
   
   when(WaitingForTurn) {
-    case Event(NotifyPlayerTurn(idForTurn), PlayerGameData(myId, _)) =>
+    case Event(NotifyPlayerTurn(idForTurn), PlayerGameData(myId, client, _)) if (idForTurn == myId) =>
       println("My turn!")
-      if(idForTurn == myId) {
-        sender ! Play(new Card(Diamonds, 5))
-        stay
-      } else {
-        stay
-      }
-    case Event(NotifyGameOver(winnderId), PlayerGameData(id, _)) =>
+      client ! GameMessage(NotifyPlayerTurn(myId))
+      goto(WaitingForClientChoice)
+    case Event(NotifyGameOver(winnderId), PlayerGameData(id, client, _)) =>
       println("Not my turn :(")
-      goto(WaitingForHand) using PlayerGameData(id, null)
+      goto(WaitingForHand) using PlayerGameData(id, client, null)
+    case Event(CardRequested(_, card), PlayerGameData(_, _, hand)) if (hand.cards.contains(card)) =>
+      
+  }
+  
+  when(WaitingForClientChoice) {
+    case Event(ClientChoice(target, card), pgd @PlayerGameData(_,_,_)) =>
+      context.parent ! MakePlay(target, card)
+      goto(WaitingForAnswer)
+  }
+  
+  when(WaitingForAnswer) {
+    case Event(MatchFound(fromPlayer, card), _) =>
+      //record match
+      goto(WaitingForTurn)
+    case Event(GoFish, _) =>
+      //go fish
+      goto(WaitingForTurn)
   }
 }
