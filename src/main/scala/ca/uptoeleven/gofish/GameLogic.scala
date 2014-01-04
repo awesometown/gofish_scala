@@ -8,13 +8,15 @@ case object Join
 
 //Targeted Outgoing Messages
 case class YouAre(playerId: Int, client: ActorRef)
-case class NotifyHand(hand: PlayerHand)
-case class NotifyPlayerTurn(playerId: Int)
-case class NotifyState(gameState: GameState)
+case class YourHand(hand: PlayerHand)
+case class YourTurn(playerId: Int)
+case class MatchRequested(requesterId: Int, card: Card)
+case class NotifyGameState(gameState: GameState)
 
 //Messages from Player Actors
-case class MakePlay(targetPlayerId: Int, card: Card)
-case class MatchFound(fromPlayerId: Int, card: Card)
+case class QueryState()
+case class MakePlay(requesterId: Int, targetPlayerId: Int, card: Card)
+case class MatchFound(requesterId: Int, targetPlayerId: Int, card: Card)
 case class GoFish(fromPlayerId: Int)
 
 //Broadcast Messages
@@ -28,17 +30,15 @@ case class NotifyGameOver(winnerId: Int)
 
 sealed trait State
 case object WaitingForPlayers extends State
-case object Playing extends State
+case object PlayerTurn extends State
+case object WaitingForResponse extends State
+//case object Playing extends State
 case object GameOver extends State
 
 sealed trait GameData
 case object Uninitialized extends GameData
 case class OnePlayer(player1: ActorRef) extends GameData
-
-case class GamePlayer(playerRef: ActorRef, hand: PlayerHand)
-
 case class WaitingPlayers(waitingPlayers: Map[Int, ActorRef]) extends GameData
-
 case class GameState(dealer: Dealer, players: Map[Int, ActorRef], currPlayerId: Int) extends GameData {
   def incrPlayer: GameState = {
     new GameState(dealer, players, if (currPlayerId >= players.size - 1) 0 else (currPlayerId + 1))
@@ -48,6 +48,8 @@ case class GameState(dealer: Dealer, players: Map[Int, ActorRef], currPlayerId: 
     players(currPlayerId)
   }
 }
+
+case class GamePlayer(playerRef: ActorRef, hand: PlayerHand)
 
 class GameLogic extends Actor with LoggingFSM[State, GameData] {
 
@@ -59,7 +61,7 @@ class GameLogic extends Actor with LoggingFSM[State, GameData] {
   when(WaitingForPlayers) {
     case Event(Join, WaitingPlayers(players)) =>
       val playerId = players.size
-      val newPlayer = context.actorOf(Props[Player])
+      val newPlayer = context.actorOf(Props[Player], name = "" + playerId)
       val newPlayers = players + (playerId -> newPlayer)
       newPlayer ! YouAre(playerId, sender)
 
@@ -68,26 +70,43 @@ class GameLogic extends Actor with LoggingFSM[State, GameData] {
       } else {
         val dealer = new Dealer(Deck.shuffledDeck)
         val playerHands = dealer.dealStartingHands(newPlayers.size, NumStartingCards)
-        newPlayers.values.zip(playerHands).foreach { case (player, hand) => player ! NotifyHand(hand) }
+        newPlayers.values.zip(playerHands).foreach { case (player, hand) => player ! YourHand(hand) }
         val startingState = GameState(dealer, newPlayers, 0)
-        goto(Playing) using startingState
+        goto(PlayerTurn) using startingState
       }
   }
 
-  when(Playing) {
-    case Event(MakePlay(target, card), gameState: GameState) if (gameState.currPlayer == sender) =>
-      val newState = gameState.incrPlayer
-      newState.currPlayer ! NotifyPlayerTurn(newState.currPlayerId)
-      goto(Playing) using newState
-    case Event(MakePlay(target, card), gameState: GameState) =>
+  when(PlayerTurn) {
+    case Event(MakePlay(requesterId, targetId, card), gameState: GameState) if (gameState.currPlayer == sender) =>
+      val target = gameState.players(targetId)
+      target ! MatchRequested(requesterId, card)
+      goto(WaitingForResponse)
+    case Event(MakePlay, gameState: GameState) =>
       stay
   }
 
+  when(WaitingForResponse) {
+    case Event(MatchFound, gameState: GameState) =>
+      val newState = gameState.incrPlayer
+      newState.currPlayer ! YourTurn(newState.currPlayerId)
+      goto(PlayerTurn) using newState
+    case Event(GoFish, gameState: GameState) =>
+      val newState = gameState.incrPlayer
+      newState.currPlayer ! YourTurn(newState.currPlayerId)
+      goto(PlayerTurn) using newState
+  }
+  
+  whenUnhandled {
+    case Event(QueryState, gameState: GameState) =>
+      sender ! NotifyGameState(gameState)
+      stay
+  }
+  
   onTransition {
-    case _ -> Playing =>
+    case _ -> PlayerTurn =>
       nextStateData match {
         case gameState: GameState =>
-          gameState.currPlayer ! NotifyPlayerTurn(gameState.currPlayerId)
+          gameState.currPlayer ! YourTurn(gameState.currPlayerId)
         case _ =>
         //don't care
       }

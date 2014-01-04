@@ -24,8 +24,19 @@ object App {
   }
   
   class Puppet extends Actor {
+    private var myId: Int = -1
+    private var myHand: PlayerHand = new PlayerHand
+    
     def receive = {
-      case whatever => println(whatever)
+      case GameMessage(YouAre(id, client)) =>
+        myId = id
+      case GameMessage(YourHand(hand)) =>
+        myHand = hand
+      case GameMessage(YourTurn(_)) =>
+        val otherPlayer = (myId + 1) % 2
+        sender ! ClientChoice(otherPlayer, myHand.cards.head)
+      case whatever =>
+        println("Got: " + whatever)
     }
   }
 }
