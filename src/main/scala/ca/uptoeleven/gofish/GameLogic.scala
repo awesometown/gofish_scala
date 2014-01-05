@@ -17,7 +17,7 @@ case class NotifyGameState(gameState: GameState)
 case class QueryState()
 case class MakePlay(requesterId: Int, targetPlayerId: Int, card: Card)
 case class MatchFound(requesterId: Int, targetPlayerId: Int, card: Card)
-case class GoFish(fromPlayerId: Int)
+case class GoFish(requesterId: Int, targetId: Int)
 
 //Broadcast Messages
 sealed trait BroadcastMessage
@@ -88,11 +88,12 @@ class GameLogic extends Actor with LoggingFSM[State, GameData] {
   when(WaitingForResponse) {
     case Event(MatchFound, gameState: GameState) =>
       val newState = gameState.incrPlayer
-      newState.currPlayer ! YourTurn(newState.currPlayerId)
+      //newState.currPlayer ! YourTurn(newState.currPlayerId)
       goto(PlayerTurn) using newState
-    case Event(GoFish, gameState: GameState) =>
+    case Event(gf @ GoFish(_,_), gameState: GameState) =>
+      gameState.currPlayer forward gf
       val newState = gameState.incrPlayer
-      newState.currPlayer ! YourTurn(newState.currPlayerId)
+      //newState.currPlayer ! YourTurn(newState.currPlayerId)
       goto(PlayerTurn) using newState
   }
   

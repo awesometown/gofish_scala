@@ -34,6 +34,7 @@ object App {
         myHand = hand
       case GameMessage(YourTurn(_)) =>
         val otherPlayer = (myId + 1) % 2
+        Thread.sleep(500)
         sender ! ClientChoice(otherPlayer, myHand.cards.head)
       case whatever =>
         println("Got: " + whatever)

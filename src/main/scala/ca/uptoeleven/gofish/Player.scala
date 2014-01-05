@@ -46,9 +46,9 @@ class Player extends Actor with LoggingFSM[PlayerState, PlayerData] {
     case Event(MatchRequested(requesterId: Int, card: Card), PlayerGameData(myId, client, hand)) =>
       hand.cards.find { c => c.rank == card.rank } match {
         case Some(matchedCard) =>
-          sender ! MatchFound(myId, requesterId, matchedCard)
+          sender ! MatchFound(requesterId, myId, matchedCard)
         case None =>
-          sender ! GoFish
+          sender ! GoFish(requesterId, myId)
       }
       stay
     case Event(NotifyGameOver(winnderId), PlayerGameData(id, client, _)) =>
@@ -66,7 +66,7 @@ class Player extends Actor with LoggingFSM[PlayerState, PlayerData] {
     case Event(MatchFound(requesterId, targetId, card), _) =>
       //record match
       goto(WaitingForTurn)
-    case Event(GoFish, _) =>
+    case Event(GoFish(_,_), _) =>
       //go fish
       goto(WaitingForTurn)
   }
